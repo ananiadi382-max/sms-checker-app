@@ -15,6 +15,7 @@ load_dotenv()
 # само отслеживает, когда номер последний раз пинговался, и предупреждает
 # ДО отправки, а не молча повторяет платный запрос.
 PING_COOLDOWN_SECONDS = 90  # с запасом сверх ограничения SMSC (~60 сек)
+MAX_PHONES_PER_BATCH = 20  # ограничение на список/файл - проверка идёт последовательно и может занимать много времени
 
 if 'ping_last_checked' not in st.session_state:
     st.session_state.ping_last_checked = {}  # phone -> unix timestamp последней Ping-проверки
@@ -250,6 +251,16 @@ with tab2:
         height=150
     )
 
+    if phones_text.strip():
+        _entered_count = len([p for p in phones_text.split('\n') if p.strip()])
+        if _entered_count > MAX_PHONES_PER_BATCH:
+            st.error(
+                f"⚠️ Введено {_entered_count} номеров — максимум за один раз {MAX_PHONES_PER_BATCH}. "
+                f"Уменьшите список (уберите {_entered_count - MAX_PHONES_PER_BATCH}) и попробуйте снова."
+            )
+        else:
+            st.caption(f"Номеров в списке: {_entered_count} из {MAX_PHONES_PER_BATCH}")
+
     force_ping_multi = True
     if do_ping_requested and phones_text.strip():
         phones_preview = [re.sub(r'\D', '', p.strip()) for p in phones_text.split('\n') if p.strip()]
@@ -265,12 +276,17 @@ with tab2:
             )
 
     if st.button("Проверить все", key="check_multiple", type="primary"):
+        phones = [p.strip() for p in phones_text.split('\n') if p.strip()]
         if not smsc:
             st.error("❌ Введите API-ключи в боковой панели")
         elif not phones_text:
             st.error("❌ Введите номера")
+        elif len(phones) > MAX_PHONES_PER_BATCH:
+            st.error(
+                f"❌ Слишком много номеров ({len(phones)}). Максимум за один раз — {MAX_PHONES_PER_BATCH}. "
+                f"Уменьшите список и попробуйте снова."
+            )
         else:
-            phones = [p.strip() for p in phones_text.split('\n') if p.strip()]
             if do_hlr and do_ping_requested:
                 spinner_text = f"Проверяем {len(phones)} номеров (HLR + Ping, это дольше)..."
             elif do_ping_requested:
@@ -331,6 +347,12 @@ with tab3:
 
             st.info(f"Найдено {len(phones)} номеров")
 
+            if len(phones) > MAX_PHONES_PER_BATCH:
+                st.error(
+                    f"⚠️ В файле {len(phones)} номеров — максимум за один раз {MAX_PHONES_PER_BATCH}. "
+                    f"Разделите файл на части поменьше и загрузите по очереди."
+                )
+
             force_ping_file = True
             if do_ping_requested and phones:
                 phones_clean = [re.sub(r'\D', '', p) for p in phones]
@@ -350,6 +372,10 @@ with tab3:
                     st.error("❌ Введите API-ключи в боковой панели")
                 elif not phones:
                     st.error("❌ Не найдены номера в файле")
+                elif len(phones) > MAX_PHONES_PER_BATCH:
+                    st.error(
+                        f"❌ Слишком много номеров ({len(phones)}). Максимум за один раз — {MAX_PHONES_PER_BATCH}."
+                    )
                 else:
                     if do_hlr and do_ping_requested:
                         spinner_text = f"Проверяем {len(phones)} номеров (HLR + Ping, это дольше)..."
@@ -441,3 +467,4 @@ if 'results' in st.session_state and st.session_state.results is not None and le
 # --- Подвал ---
 st.markdown("---")
 st.caption("Приложение использует HLR-запросы через SMSC API. Каждый запрос тарифицируется.")
+
