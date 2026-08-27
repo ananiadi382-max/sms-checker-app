@@ -1,0 +1,20 @@
+# Секреты - никогда не коммитить
+.env
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+venv/
+env/
+.venv/
+
+# Экспортированные результаты проверок (могут содержать реальные номера)
+*.csv
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
